@@ -1,6 +1,5 @@
 # fiber-photometry-code
 
-===============================
 This code is to analyze behavior and fiber photometry data 
 
 How-to
