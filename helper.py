@@ -11,6 +11,7 @@ import skvideo.io
 from scipy.io import savemat
 from scipy.optimize.minpack import curve_fit
 import scipy.stats as stats
+import re
 
 
 def set_path(path):
@@ -84,7 +85,7 @@ def time_in_section(tracks, fps=20, lower=0, upper=np.inf):
     return sum(i>lower and i<upper for i in tracks)/fps
 
 
-def get_tracks(ksize=4, threshold=15, chamber_mask=None):
+def get_tracks(video_name, output_path, ksize=4, threshold=15, chamber_mask=None):
     """
     Track the position of the mouse as it explores the 3-chamber environment.
     :param ksize: kernel size for morphological opening
@@ -96,8 +97,6 @@ def get_tracks(ksize=4, threshold=15, chamber_mask=None):
     :return: x_pos, y_pos: x and y positions of the mouse as a function of time
     :return: chamber_mask: return the manually drawn ROI so it does not need to be drawn again if processing in batch
     """
-
-    video_name = behavior_raw.split("\\")[-1][:-5]
 
     # REWRITE THIS GETTING RID OF OPENCV IMAGE READINg
     for file in os.listdir(output_path):
@@ -141,7 +140,7 @@ def get_tracks(ksize=4, threshold=15, chamber_mask=None):
         x_pos.append(cx)
         y_pos.append(cy)
 
-        cv2.imshow(behavior_raw, frame)
+        cv2.imshow(video_name, frame)
 
         out.write(frame)
 
@@ -161,7 +160,7 @@ def get_tracks(ksize=4, threshold=15, chamber_mask=None):
 
     plt.figure()
     plt.plot(x_pos, -np.array(y_pos))
-    plt.title(behavior_raw)
+    plt.title(video_name)
     plt.xlabel('Top time: ' + str(top_time) + ' Bottom time: ' + str(bottom_time))
     plt.xlim(np.min(x_bounds), np.max(x_bounds))
     plt.ylim(-np.max(y_bounds), -np.min(y_bounds))
@@ -370,8 +369,8 @@ def make_annotations(boolean, t, color='g', alpha=0.25):
         plt.axvspan(t[event_starts[i]], t[event_ends[i]], facecolor=color, alpha=alpha)
 
 
-def make_annotated_plot(save_figs=True):
-    plt.figure(figsize=(15, 8)), \
+def make_annotated_plot(x_pos, y_pos, t, dff465, output_path, video_name, experiment_type="3-chamber"):
+    plt.figure(figsize=(15, 8)), 
 
     one_chamber_size = np.round((np.max(y_pos) - np.min(y_pos)) / 3)
     top_middle_edge = np.max(y_pos) - one_chamber_size
@@ -381,34 +380,71 @@ def make_annotated_plot(save_figs=True):
     bottom_time = time_in_section(y_pos, lower=top_middle_edge)
 
     plt.subplot(211)
-    plt.plot(y_pos, x_pos, 'k')
-    plt.axvspan(np.nanmin(y_pos), (np.nanmin(y_pos) + 1 / 3 * (np.nanmax(y_pos) - np.nanmin(y_pos))), facecolor='r', alpha=0.25)
-    plt.axvspan((np.nanmax(y_pos) - 1 / 3 * (np.nanmax(y_pos) - np.nanmin(y_pos))), np.nanmax(y_pos), facecolor='b', alpha=0.25)
-    plt.title('Left time: ' + str(top_time) + ' Right time: ' + str(bottom_time))
+    
+	
+    if experiment_type == "3-chamber":
+        plt.plot(y_pos, x_pos, 'k')
+        plt.axvspan(np.nanmin(y_pos), (np.nanmin(y_pos) + 1/3 * (np.nanmax(y_pos) - np.nanmin(y_pos))), facecolor='r', alpha=0.25)
+        plt.axvspan((np.nanmax(y_pos) - 1/3 * (np.nanmax(y_pos) - np.nanmin(y_pos))), np.nanmax(y_pos), facecolor='b', alpha=0.25)
+        plt.title('Left time: ' + str(top_time) + ' Right time: ' + str(bottom_time))
+        
+        in_left = y_pos < (np.nanmin(y_pos) + 1 / 3 * (np.nanmax(y_pos) - np.nanmin(y_pos)))
+        in_right = y_pos > (np.nanmax(y_pos) - 1 / 3 * (np.nanmax(y_pos) - np.nanmin(y_pos)))
+        
+    elif experiment_type == "open-field":
+        plt.plot(x_pos, -y_pos, 'k')
+        loc = re.findall(r"-.{2}-", video_name)[0][1:-1]
+        if loc[0] == "U":
+            y_corner = y_pos < (np.nanmax(y_pos) + np.nanmin(y_pos))/2
+            low_y = (np.nanmax(y_pos) + np.nanmin(y_pos))/2
+            high_y = np.nanmin(y_pos)
+        elif loc[0] == "L":
+            y_corner = y_pos > (np.nanmax(y_pos) + np.nanmin(y_pos))/2
+            low_y = np.nanmax(y_pos)
+            high_y = (np.nanmax(y_pos) + np.nanmin(y_pos))/2
+        else:
+            y_corner = False
+        
+        if loc[1] == "L":
+            x_corner = x_pos < (np.nanmax(x_pos) + np.nanmin(x_pos))/2
+            low_x = np.nanmin(x_pos)
+            high_x = (np.nanmax(x_pos) + np.nanmin(x_pos))/2
+        elif loc[1] == "R":
+            x_corner = x_pos > (np.nanmax(x_pos) + np.nanmin(x_pos))/2
+            low_x = (np.nanmax(x_pos) + np.nanmin(x_pos))/2
+            high_x = np.nanmax(x_pos)
+        else:
+            x_corner = False
+        
+        plt.axvspan(xmin=low_x, xmax=high_x, ymin=low_y, ymax=high_y, facecolor='r', alpha=0.25)
+        
+        in_corner = x_corner & y_corner
+
+		
     plt.xticks([])
     plt.yticks([])
 
     plt.subplot(212)
     plt.plot(t, dff465, 'k')
-    in_left = y_pos < (np.nanmin(y_pos) + 1 / 3 * (np.nanmax(y_pos) - np.nanmin(y_pos)))
-    in_right = y_pos > (np.nanmax(y_pos) - 1 / 3 * (np.nanmax(y_pos) - np.nanmin(y_pos)))
-    make_annotations(in_left, t, color='r')
-    make_annotations(in_right, t, color='b')
+    if experiment_type == "3-chamber":
+        make_annotations(in_left, t, color='r')
+        make_annotations(in_right, t, color='b')
+    elif experiment_type == "open-field":
+	    make_annotations(in_corner, t, color='r')
 
     plt.ylabel(r'ΔF/F ($\sigma$)', fontsize=18)
     plt.xlabel('Time (s)', fontsize=18)
     plt.xticks(fontsize=15)
     plt.yticks(fontsize=15)
 
-    if save_figs:
-        plt.savefig(output_path + os.path.sep + video_name + '_DFFannotated.png')
+    plt.savefig(output_path + os.path.sep + video_name + '_DFFannotated.png')
 
 
 def trim_video(behavior_raw, output_path):
     video_name = behavior_raw.split("\\")[-1][:-5]
 
     # Read behavior video and crop to LED ON/OFF times
-    print("[+] Reading behavior video...")
+    print("Reading behavior video...")
     video_data = skvideo.io.vread(behavior_raw)
     data_range = get_LED_on(video_data)
     video_data = video_data[data_range[0]:data_range[1], :, :, :]
@@ -416,7 +452,7 @@ def trim_video(behavior_raw, output_path):
     # Save chamber image as max projection. Use subset of video to reduce time
     mid = int(video_data.shape[0] / 2)
     chamber = np.max(video_data[mid - 300:mid + 300, :, :, 0], axis=0).astype('uint8')
-    print("[+] Writing trimmed video...")
+    print("Writing trimmed video...")
     cv2.imwrite(output_path + os.path.sep + video_name + "_chamber.jpg", chamber)
 
     # Save number of behavior frames
