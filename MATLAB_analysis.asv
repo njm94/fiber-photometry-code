@@ -55,7 +55,7 @@ data_interp = interp1(t, data_detrend, pi_t);
 %%
 % data_interp = dff465;
 data_interp = zscore(data465(10:end)-test);
-[peaks, locs, w, p] = findpeaks(data_interp, 'MinPeakProminence', 3.5, 'MinPeakWidth', 5);
+[peaks, locs, w, p] = findpeaks(data_interp, 'MinPeakProminence', , 'MinPeakWidth', 5);
 figure, plot(data_interp, 'LineWidth', 2), grid on, hold on, xline(locs)%xline(pi_t(locs))
 
 

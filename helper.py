@@ -296,11 +296,11 @@ def deltaFF(data, t, method='exp_fit'):
 
 
 def make_combined_video(output_path, video_name, t, dff465, dff560):
-    for file in os.listdir(output_path):
-        if "_marked.avi" in file:
-            behavior_video = output_path + os.path.sep + file
-        elif "_trimmed.avi" in file:
-            behavior_video = output_path + os.path.sep + file
+    try:
+        behavior_video = output_path + os.path.sep + video_name + "_trimmed.avi"
+    except:
+        raise Exception("Trimmed behavior video is not present in the output path")
+
 
     x = input("Use jRCaMP1b channel? y/[n]")
     if x == "y" or x == "Y":
@@ -471,3 +471,25 @@ def trim_video(behavior_raw, output_path):
     print("Done")
 
 
+def quantify_corner_time(x, y, loc):
+    if loc[0] == 'U':
+        y_corner = y < (np.nanmin(y) + 1/2 * (np.nanmax(y) - np.nanmin(y)))
+    elif loc[0] == 'L':
+        y_corner = y > (np.nanmin(y) + 1/2 * (np.nanmax(y) - np.nanmin(y)))
+    else:
+        print("Invalid location input for Y")
+
+    if loc[1] == 'L':
+        x_corner = x < (np.nanmin(x) + 1/2 * (np.nanmax(x) - np.nanmin(x)))
+    elif loc[1] == 'R':
+        x_corner = x > (np.nanmin(x) + 1/2 * (np.nanmax(x) - np.nanmin(x)))
+    else:
+        print("Invalid location input for X")
+
+    x_center = (x > (np.nanmin(x) + 1/4 * (np.nanmax(x) - np.nanmin(x)))) & (x < (np.nanmin(x) + 3/4 * (np.nanmax(x) - np.nanmin(x))))
+    y_center = (y > (np.nanmin(y) + 3/4 * (np.nanmax(y) - np.nanmin(y)))) & (x < (np.nanmin(y) + 3/4 * (np.nanmax(y) - np.nanmin(y))))
+
+    corner_time = 100*sum(x_corner & y_corner)/len(x)
+    center_time = 100*sum(x_center & y_center)/len(x)
+
+    return corner_time, center_time
